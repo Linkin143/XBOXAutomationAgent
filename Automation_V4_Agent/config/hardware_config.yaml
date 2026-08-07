@@ -1,0 +1,132 @@
+# ============================================================
+# Hardware Configuration — Automation V4 Agent
+# Replaces: eDAT_Serial_Configuration.xml
+#           eDAT_KBM_Hardware_Configuration.xml
+# ============================================================
+
+gimx:
+  # GIMX controller emulation (runs as separate process)
+  executable: "C:\\Program Files\\GIMX\\gimx.exe"
+  config_dir: "C:\\Program Files\\GIMX\\"
+
+  controller_1:
+    config_file: "XOnePadUsb.xml"
+    host: "127.0.0.1"
+    port: 51914
+    com_port: "COM3"       # GIMX USB adapter COM port (check Device Manager)
+
+  controller_2:
+    config_file: "XOnePadUsb.xml"
+    host: "127.0.0.1"
+    port: 51915
+    com_port: "COM6"       # Second GIMX adapter COM port
+
+  # GIMX button/axis index mapping (from eDAT_ControllerV3_Script.ps1)
+  button_map:
+    LEFT_STICK_X: 0
+    LEFT_STICK_Y: 1
+    RIGHT_STICK_X: 2
+    RIGHT_STICK_Y: 3
+    VIEW: 128
+    MENU: 129
+    GUIDE: 130         # Xbox button
+    UP: 131
+    RIGHT: 132
+    DOWN: 133
+    LEFT: 134
+    Y: 135
+    B: 136
+    A: 137
+    X: 138
+    LB: 139
+    RB: 140
+    LT: 141
+    RT: 142
+    LS: 143            # Left stick click
+    RS: 144            # Right stick click
+
+  # Axis values
+  PRESSED: 255
+  RELEASE: 0
+  TRIGGER_FULL_PRESS: 1023
+  STICK_FULL_RIGHT: 32767
+  STICK_FULL_DOWN: 32767
+  STICK_FULL_LEFT: -32767
+  STICK_FULL_UP: -32767
+
+  # Timing (milliseconds) — from eDAT_ControllerV3_Script.ps1
+  short_press_time_ms: 110
+  long_press_time_ms: 1500
+  key_press_cooldown_ms: 220
+  post_press_delay_ms: 1000
+
+serial:
+  # Relay board (NCD Relay) — replaces PortLabel2 in eDAT_Serial_Configuration.xml
+  relay_board:
+    label: "PortLabel2"
+    port: "COM8"
+    baud_rate: 9600
+    data_bits: 8
+    parity: "None"
+    stop_bits: 1
+    flow_control: "xonxoff"
+    read_timeout_ms: 4000
+    write_timeout_ms: 1000
+    wait_for_data_ms: 4000
+
+  # Digital Pot — replaces PortLabel3
+  digital_pot:
+    label: "PortLabel3"
+    port: "COM6"
+    baud_rate: 115200
+    data_bits: 8
+    parity: "None"
+    stop_bits: 1
+    flow_control: "xonxoff"
+    read_timeout_ms: 4000
+    write_timeout_ms: 1000
+
+  # Arduino UNO (Hardware KBM) — replaces COM3 @ 9600 in KBM config
+  arduino_kbm:
+    label: "COM4_KBM"
+    port: "COM3"
+    baud_rate: 9600
+    data_bits: 8
+    parity: "None"
+    stop_bits: 1
+    flow_control: "none"
+    read_timeout_ms: 1000
+    write_timeout_ms: 1000
+    wait_for_data_ms: 5000
+
+camera:
+  # AVerMedia U3 Video Capture — replaces Hcl.eDAT.ImageCapture.dll
+  capture_device:
+    name: "AVerMedia U3 Video Capture"
+    device_index: 0           # OpenCV device index (check with enumerate_devices())
+    resolution_width: 1920
+    resolution_height: 1080
+    framerate: 30
+    format: "MJPG"            # or "YUY2"
+    backend: "DSHOW"          # DirectShow backend on Windows
+
+  # Image storage paths
+  captured_image_folder: "Images\\Captured\\Console\\"
+  reference_image_folder: "Images\\Reference\\"
+  icon_image_folder: "Images\\Icon\\XBoxConsole\\"
+
+  # Icon base size for pattern matching (from Constants.ps1)
+  icon_base_width: 1920
+  icon_base_height: 1080
+
+audio:
+  device_name: "AVerMedia Ain (DarkCrystal 750)"
+  format: "PCM, 44100 Hz, 16 Bits, 2 Channels"
+
+ir_blaster:
+  # USB-UIRT IR blaster device
+  enabled: true
+  device: "USB-UIRT"
+
+consoles:
+  active_consoles: 1     # Set to 2 for dual-console testing

@@ -1,0 +1,123 @@
+# ============================================================
+# Game Configuration — Automation V4 Agent
+# Replaces: per-game .ps1 scripts' configuration
+# ============================================================
+
+global:
+  game_play_time_minutes: 3
+  ui_version: "new"         # "new" or "old" Xbox UI
+  launch_method: "Search"   # "Search" or "GamePass" or "Recent"
+  console_type: "Gen9_vNext_Anaconda"
+
+# --- Active games for Gen9 vNext run ---
+# Maps to game_scripts/ Python modules
+active_games:
+  - name: "Ben 10 Power Trip"
+    module: "ben10_power_trip"
+    search_name: "Ben 10"
+    enabled: true
+
+  - name: "Max The Curse Brotherhood"
+    module: "max_curse_brotherhood"
+    search_name: "Max The Curse"
+    enabled: true
+
+  - name: "Sea Of Stars"
+    module: "sea_of_stars"
+    search_name: "Sea of Stars"
+    enabled: true
+
+  - name: "State Of Decay 2"
+    module: "state_of_decay2"
+    search_name: "State of Decay 2"
+    enabled: true
+
+  - name: "Zoo Tycoon"
+    module: "zoo_tycoon"
+    search_name: "Zoo Tycoon"
+    enabled: true
+
+  - name: "Hollow Knight"
+    module: "hollow_knight"
+    search_name: "Hollow Knight"
+    enabled: true
+
+  - name: "My Time At Portia"
+    module: "my_time_at_portia"
+    search_name: "My Time At Portia"
+    enabled: true
+
+  - name: "Neon Abyss"
+    module: "neon_abyss"
+    search_name: "Neon Abyss"
+    enabled: true
+
+  - name: "Celeste"
+    module: "celeste"
+    search_name: "Celeste"
+    enabled: true
+
+  - name: "Gears 5"
+    module: "gears5"
+    search_name: "Gears 5"
+    enabled: true
+
+  - name: "Gears Of War 4"
+    module: "gears_of_war4"
+    search_name: "Gears of War 4"
+    enabled: true
+
+  - name: "Mass Effect"
+    module: "mass_effect"
+    search_name: "Mass Effect"
+    enabled: true
+
+  - name: "Medieval Dynasty"
+    module: "medieval_dynasty"
+    search_name: "Medieval Dynasty"
+    enabled: true
+
+  - name: "Recore"
+    module: "recore"
+    search_name: "Recore"
+    enabled: true
+
+  - name: "Forza Horizon 4"
+    module: "forza_horizon4"
+    search_name: "Forza Horizon 4"
+    enabled: true
+
+  - name: "Banjo Tooie"
+    module: "banjo_tooie"
+    search_name: "Banjo-Tooie"
+    enabled: true
+
+  - name: "Rocket League"
+    module: "rocket_league"
+    search_name: "Rocket League"
+    enabled: true
+
+  - name: "Research And Destroy"
+    module: "research_and_destroy"
+    search_name: "Research and Destroy"
+    enabled: true
+
+  - name: "Pikuniku"
+    module: "pikuniku"
+    search_name: "Pikuniku"
+    enabled: true
+
+# --- Report settings ---
+report:
+  name_template: "Gen9_vNext_AnacondaReport-{timestamp}.docx"
+  template_file: "TextX_Template_Report.docx"
+  output_folder: "Report\\Results\\"
+  timestamp_format: "%b%d-%Y_%I-%M-%S%p"
+
+# --- Timeouts (seconds) ---
+timeouts:
+  pattern_match: 30
+  ocr_verify: 10
+  game_launch: 60
+  home_screen: 20
+  guide_open: 10

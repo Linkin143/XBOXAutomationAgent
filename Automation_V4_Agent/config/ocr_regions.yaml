@@ -1,0 +1,94 @@
+# ============================================================
+# OCR Region Configuration — Automation V4 Agent
+# Replaces: eDAT_OCR_XBOX_Configuration.xml
+#           eDAT_OCR_DefaultOCR1_Configuration.xml
+# Each region is (x, y, width, height) in pixels at 1920x1080
+# ============================================================
+
+ocr_label: "DefaultOCR1"
+
+# --- Account sign-in regions (from SignInProfile function) ---
+regions:
+  Account1:
+    x: 760
+    y: 300
+    width: 400
+    height: 50
+    description: "First account email in sign-in list"
+
+  Account2:
+    x: 760
+    y: 370
+    width: 400
+    height: 50
+    description: "Second account email"
+
+  Account3:
+    x: 760
+    y: 440
+    width: 400
+    height: 50
+
+  Account4:
+    x: 760
+    y: 510
+    width: 400
+    height: 50
+
+  Account5:
+    x: 760
+    y: 580
+    width: 400
+    height: 50
+
+  Account6:
+    x: 760
+    y: 650
+    width: 400
+    height: 50
+
+  # --- Sign-in screen region ---
+  signIN_Top1:
+    x: 700
+    y: 250
+    width: 500
+    height: 60
+    description: "Sign-in prompt text area"
+
+  # --- Message/chat regions ---
+  msg_sent1:
+    x: 400
+    y: 500
+    width: 600
+    height: 80
+    description: "Sent message text area"
+
+  msg_rcd1:
+    x: 400
+    y: 550
+    width: 600
+    height: 80
+    description: "Received message text area"
+
+  msg_send2:
+    x: 400
+    y: 620
+    width: 600
+    height: 80
+
+  msg_rcd2:
+    x: 400
+    y: 670
+    width: 600
+    height: 80
+
+# --- OCR engine settings ---
+ocr_settings:
+  language: "eng"
+  tesseract_config: "--psm 6"    # Uniform block of text
+  trained_data_path: "tessdata"  # Path to eng.traineddata
+  preprocessing:
+    resize_factor: 2.0           # Upscale before OCR for better accuracy
+    grayscale: true
+    threshold: true
+    threshold_value: 150

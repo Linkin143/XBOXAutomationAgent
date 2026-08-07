@@ -1,0 +1,61 @@
+# ============================================================
+# Automation V4 Agent — LLM Configuration
+# LiteLLM unified interface: routes to GPT-4o or Claude Sonnet
+# ============================================================
+
+llm:
+  # ── Primary model (used by default) ──────────────────────
+  # LiteLLM model strings:
+  #   OpenAI  : "gpt-4o" | "gpt-4-turbo" | "gpt-4o-mini"
+  #   Anthropic: "claude-3-5-sonnet-20241022" | "claude-3-opus-20240229"
+  primary_model: "gpt-4o"
+
+  # ── Fallback model (used if primary fails or rate-limits) ─
+  fallback_model: "claude-3-5-sonnet-20241022"
+
+  # ── Sampling parameters ───────────────────────────────────
+  # Keep temperature low for deterministic test automation
+  temperature: 0.1
+  max_tokens: 2048
+  timeout_seconds: 60
+
+  # ── Retry / resilience ───────────────────────────────────
+  max_retries: 3
+  retry_delay_seconds: 5
+
+  # ── Provider priority (LiteLLM fallback order) ───────────
+  provider_priority:
+    - openai
+    - anthropic
+
+  # ── ReAct agent settings ─────────────────────────────────
+  agent_max_iterations: 25      # max tool-call loop iterations per test
+  agent_verbose: true           # print LLM reasoning steps to console
+  agent_handle_parse_errors: true
+
+  # ── System prompt role ───────────────────────────────────
+  # The LLM is instructed to be an Xbox test automation engineer.
+  # This is injected into the ReAct agent prompt.
+  system_role: |
+    You are an expert Xbox console test automation engineer.
+    You have access to hardware tools to control Xbox consoles via GIMX
+    gamepad emulation, capture and verify screens using computer vision,
+    read on-screen text using OCR, and log test results to a Word report.
+
+    Your job is to execute game test scenarios step-by-step:
+    1. Press controller buttons to navigate menus
+    2. Verify the correct screen appears using pattern matching
+    3. Read text using OCR when needed
+    4. Log PASS/FAIL results for each test action
+    5. Always be methodical — verify each step before proceeding
+
+    When a step fails, retry up to 2 times before marking it FAIL.
+    Always return to the Xbox home screen after finishing a game test.
+
+# ── Environment variable overrides ───────────────────────────
+# Set these env vars to override config at runtime (no code change needed):
+#   LITELLM_MODEL          → overrides primary_model
+#   LITELLM_FALLBACK_MODEL → overrides fallback_model
+#   LITELLM_TEMPERATURE    → overrides temperature
+#   OPENAI_API_KEY         → required for GPT-4o
+#   ANTHROPIC_API_KEY      → required for Claude
