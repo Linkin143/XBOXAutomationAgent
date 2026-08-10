@@ -4,10 +4,12 @@ from ..hardware.gimx_controller import XboxButton
 from ..utils.helpers import wait_ms
 from ..utils.logger import get_logger
 from .base_game import BaseGame
+from .registry import register
 
 log = get_logger("game.hollow_knight")
 
 
+@register("hollow knight")
 class HollowKnightGame(BaseGame):
     """Tests for Hollow Knight on Xbox."""
 

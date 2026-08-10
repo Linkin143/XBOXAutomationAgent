@@ -4,10 +4,12 @@ from ..hardware.gimx_controller import XboxButton
 from ..utils.helpers import wait_ms
 from ..utils.logger import get_logger
 from .base_game import BaseGame
+from .registry import register
 
 log = get_logger("game.sea_of_stars")
 
 
+@register("sea of stars")
 class SeaOfStarsGame(BaseGame):
     """Tests for Sea of Stars on Xbox."""
 

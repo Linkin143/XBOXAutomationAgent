@@ -19,13 +19,24 @@ class LaunchState(TypedDict):
     error: Optional[str]
 
 
+def _get_ctrl(console: int):
+    """Build a GimxController from hardware_config.yaml for the given console."""
+    from ..hardware.gimx_controller import GimxController, GimxConfig
+    from ..config.loader import get_hw_config
+    gimx = get_hw_config().get("gimx", {})
+    key = "controller_1" if console == 1 else "controller_2"
+    c = gimx.get(key, {})
+    return GimxController(config=GimxConfig(
+        host=c.get("host", "127.0.0.1"),
+        port=c.get("port", 51914 if console == 1 else 51915),
+        com_port=c.get("com_port", "COM8" if console == 1 else "COM6"),
+    ))
+
+
 def node_press_guide(state: LaunchState) -> LaunchState:
     log.debug(f"[{state['game_name']}] Pressing Guide button…")
-    from ..hardware.gimx_controller import GimxController, XboxButton
-    from ..config.loader import get_hw_config
-    cfg = get_hw_config().get("gimx", {})
-    port = cfg.get("port_c1", 51914) if state["console"] == 1 else cfg.get("port_c2", 51915)
-    ctrl = GimxController(port=port)
+    from ..hardware.gimx_controller import XboxButton
+    ctrl = _get_ctrl(state["console"])
     ctrl.short_press(XboxButton.GUIDE)
     wait_ms(2000)
     return state
@@ -33,11 +44,8 @@ def node_press_guide(state: LaunchState) -> LaunchState:
 
 def node_navigate_to_game(state: LaunchState) -> LaunchState:
     log.debug(f"[{state['game_name']}] Navigating to game tile…")
-    from ..hardware.gimx_controller import GimxController, XboxButton
-    from ..config.loader import get_hw_config
-    cfg = get_hw_config().get("gimx", {})
-    port = cfg.get("port_c1", 51914) if state["console"] == 1 else cfg.get("port_c2", 51915)
-    ctrl = GimxController(port=port)
+    from ..hardware.gimx_controller import XboxButton
+    ctrl = _get_ctrl(state["console"])
     ctrl.short_press(XboxButton.RIGHT)
     wait_ms(500)
     ctrl.short_press(XboxButton.A)

@@ -21,9 +21,8 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
-from langchain_core.prompts import PromptTemplate
+from langchain_classic.agents import AgentExecutor, create_react_agent
+from langchain_classic.prompts import PromptTemplate
 
 from .controller_agent import build_controller_tools
 from .vision_agent import build_vision_tools

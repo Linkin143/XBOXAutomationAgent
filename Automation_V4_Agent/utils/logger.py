@@ -1,8 +1,18 @@
 ﻿"""Logging setup using loguru — replaces V3 eDAT logging."""
 from __future__ import annotations
 import sys
+import io
 from pathlib import Path
 from loguru import logger
+
+# Wrap stdout in UTF-8 so emoji / arrow characters don't crash on Windows
+# terminals that default to cp1252.  This is a no-op on systems already UTF-8.
+_stdout_utf8 = io.TextIOWrapper(
+    sys.stdout.buffer,
+    encoding="utf-8",
+    errors="replace",
+    line_buffering=True,
+) if hasattr(sys.stdout, "buffer") else sys.stdout
 
 _INITIALIZED = False
 
@@ -16,9 +26,10 @@ def setup_logging(log_dir: str = "logs", level: str = "DEBUG") -> None:
     log_path.mkdir(parents=True, exist_ok=True)
 
     logger.remove()  # Remove default sink
-    # Console sink — INFO and above
+    # Console sink — INFO and above, via UTF-8 wrapper so emoji/arrows render
+    # correctly on Windows terminals that default to cp1252.
     logger.add(
-        sys.stdout,
+        _stdout_utf8,
         level="INFO",
         format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> — <level>{message}</level>",
         colorize=True,

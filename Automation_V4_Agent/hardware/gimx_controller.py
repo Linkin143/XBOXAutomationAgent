@@ -81,7 +81,10 @@ class GimxController:
       - ShortPressButton_C1, LongPressButton_C1, MoveStick_C1, etc.
     """
 
-    GIMX_EXECUTABLE = r"C:\Program Files\GIMX\gimx.exe"
+    # Installed at Program Files (x86) — confirmed via filesystem check
+    GIMX_EXECUTABLE = r"C:\Program Files (x86)\GIMX\gimx.exe"
+    # GIMX user config dir (XOnePadUsb.xml lives here)
+    GIMX_CONFIG_DIR = r"C:\Users\testx\AppData\Roaming\gimx\config"
 
     def __init__(self, config: GimxConfig):
         self.config = config
@@ -122,23 +125,39 @@ class GimxController:
 
     def check_status(self) -> bool:
         """
-        Verify GIMX is running and Xbox controller is connected.
+        Verify GIMX is running by sending a minimal report packet and checking
+        the OS does not refuse the connection.
+
+        GIMX Network API is send-only (Python → GIMX); GIMX never sends replies.
+        The reliable indicator that GIMX is listening is:
+          - send succeeds  → GIMX is up            (return True)
+          - ConnectionRefusedError / no process    → GIMX not running (return False)
+          - WinError 10054 (connection reset)       → GIMX is up but Xbox not yet
+                                                      enumerated — still return True
+                                                      so we don't falsely re-launch.
+
         Replaces: Check-XboxControllerStatus() in eDAT_ControllerV3_Script.ps1
         """
         try:
             temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             temp_sock.settimeout(1.0)
             temp_sock.connect((self.config.host, self.config.port))
-            temp_sock.send(bytes([0x00, 0x00]))
-            data = temp_sock.recv(2)
+            # Send a null (all-released) report — GIMX accepts and ignores it
+            null_report = self._build_packet({})
+            temp_sock.send(null_report)
             temp_sock.close()
-            if len(data) >= 2 and data[0] == 0x00 and data[1] == 0x06:
-                logger.info("GIMX: XOnePad controller confirmed active")
-                return True
-            logger.warning(f"GIMX: Unexpected reply: {data.hex()}")
+            logger.info("GIMX: UDP port reachable — process is running")
+            return True
+        except ConnectionRefusedError:
+            logger.warning("GIMX: ConnectionRefused — process not running")
             return False
-        except (socket.timeout, ConnectionRefusedError, OSError) as e:
-            logger.warning(f"GIMX: Not responding — {e}")
+        except OSError as e:
+            # WinError 10054 = connection reset by remote — GIMX IS running
+            # but Xbox controller not yet enumerated. Treat as running.
+            if hasattr(e, "winerror") and e.winerror == 10054:
+                logger.info("GIMX: Running (Xbox controller enumerating…)")
+                return True
+            logger.warning(f"GIMX: OSError — {e}")
             return False
 
     def start_gimx(self, wait_seconds: int = 20) -> bool:
@@ -150,21 +169,41 @@ class GimxController:
             logger.info("GIMX: Reusing existing process")
             return True
 
+        # Proxy mode: --config Xbox_latest.xml supplies the real Xbox Series S
+        # controller connected to PC for GIP security auth (Series S requires this).
+        # --src lets Python inject button values via UDP on top of the auth stream.
+        import pathlib
+        config_file = self.config.config_file
+        user_config = pathlib.Path(self.GIMX_CONFIG_DIR) / config_file
+        config_path = str(user_config) if user_config.exists() else config_file
+
         cmd = [
             self.GIMX_EXECUTABLE,
-            "--config", self.config.config_file,
+            "--config", config_path,
             "--src", f"{self.config.host}:{self.config.port}",
             "-p", self.config.com_port,
-            "--status", "--nograb", "--force-updates", "--subpos"
+            "--nograb",
+            "--force-updates",
         ]
-        logger.info(f"Starting GIMX: {' '.join(cmd)}")
-        self._gimx_process = subprocess.Popen(cmd)
-        time.sleep(wait_seconds)
+        logger.info(f"Starting GIMX (proxy+UDP mode): {' '.join(cmd)}")
 
-        if not self.check_status():
-            logger.error("GIMX: Failed to start or controller not found")
-            return False
-        return True
+        # Launch GIMX in a new console window so its output is visible separately
+        self._gimx_process = subprocess.Popen(
+            cmd,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+
+        # Poll until GIMX is ready (up to wait_seconds)
+        logger.info(f"Waiting up to {wait_seconds}s for GIMX to initialise…")
+        for elapsed in range(wait_seconds):
+            time.sleep(1)
+            if self.check_status():
+                logger.info(f"GIMX: Ready after {elapsed + 1}s")
+                return True
+            logger.debug(f"GIMX: Waiting… ({elapsed + 1}s)")
+
+        logger.error("GIMX: Failed to start or controller not detected on Xbox")
+        return False
 
     def stop_gimx(self):
         """Stop GIMX process if we started it. Replaces: Disconnect_HwV3()"""

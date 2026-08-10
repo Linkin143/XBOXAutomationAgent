@@ -1,7 +1,7 @@
 ﻿"""LangChain tool wrappers for screen verification (pattern match + OCR)."""
 from __future__ import annotations
 from langchain.tools import tool
-from ..vision.pattern_match import ScreenVerifier
+from ..vision.pattern_match import ScreenVerifier, PatternMatcher
 from ..vision.ocr_engine import OcrEngine
 from ..hardware.video_capture import VideoCapture
 from ..utils.logger import get_logger
@@ -13,17 +13,30 @@ class VisionAgent:
     """Wraps ScreenVerifier and OcrEngine with LangChain-compatible interface."""
 
     def __init__(self):
+        from ..config.loader import get_hw_config
+        cfg = get_hw_config()
+        cam_cfg = cfg.get("camera", {})
+        self._device_index: int = cam_cfg.get("device_index", 0)
+        captured_folder: str = cam_cfg.get("captured_image_folder", "Images\\Captured\\Console\\")
+        icon_folder: str = cam_cfg.get("icon_image_folder", "Images\\Icon\\XBoxConsole\\")
+
         self.capture: VideoCapture | None = None
-        self.verifier = ScreenVerifier()
+        # ScreenVerifier is created with a PatternMatcher and folder paths.
+        # The capture device is wired in lazily inside _ensure_capture().
+        self.verifier = ScreenVerifier(
+            capture_device=None,
+            matcher=PatternMatcher(),
+            captured_folder=captured_folder,
+            icon_folder=icon_folder,
+        )
         self.ocr = OcrEngine()
 
     def _ensure_capture(self):
         if self.capture is None:
-            from ..config.loader import get_hw_config
-            cfg = get_hw_config()
-            idx = cfg.get("camera", {}).get("device_index", 0)
-            self.capture = VideoCapture(device_index=idx)
+            self.capture = VideoCapture(device_index=self._device_index)
             self.capture.open()
+            # Wire the live capture device into the verifier now that it exists.
+            self.verifier.capture = self.capture
 
     def capture_screen(self, save_path: str) -> str | None:
         self._ensure_capture()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 from langchain.tools import tool
-from ..hardware.gimx_controller import GimxController, XboxButton
+from ..hardware.gimx_controller import GimxController, GimxConfig, XboxButton
 from ..utils.logger import get_logger
 
 log = get_logger("controller_agent")
@@ -17,22 +17,24 @@ def _get_controller(console: int) -> GimxController:
     if console == 1:
         if _ctrl1 is None:
             from ..config.loader import get_hw_config
-            cfg = get_hw_config()
-            gc = cfg.get("gimx", {})
-            _ctrl1 = GimxController(
-                host=gc.get("host", "127.0.0.1"),
-                port=gc.get("port_c1", 51914),
-            )
+            gimx = get_hw_config().get("gimx", {})
+            c1 = gimx.get("controller_1", {})
+            _ctrl1 = GimxController(config=GimxConfig(
+                host=c1.get("host", "127.0.0.1"),
+                port=c1.get("port", 51914),
+                com_port=c1.get("com_port", "COM8"),
+            ))
         return _ctrl1
     else:
         if _ctrl2 is None:
             from ..config.loader import get_hw_config
-            cfg = get_hw_config()
-            gc = cfg.get("gimx", {})
-            _ctrl2 = GimxController(
-                host=gc.get("host", "127.0.0.1"),
-                port=gc.get("port_c2", 51915),
-            )
+            gimx = get_hw_config().get("gimx", {})
+            c2 = gimx.get("controller_2", {})
+            _ctrl2 = GimxController(config=GimxConfig(
+                host=c2.get("host", "127.0.0.1"),
+                port=c2.get("port", 51915),
+                com_port=c2.get("com_port", "COM6"),
+            ))
         return _ctrl2
 
 

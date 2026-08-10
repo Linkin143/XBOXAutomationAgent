@@ -50,7 +50,7 @@ class TestState(TypedDict):
 
 # --- Nodes ---
 
-def node_initialize(state: TestState) -> TestState:
+def node_initialize(state: TestState) -> dict:
     """Set up initial state, log LLM brain info."""
     log.info("=== Xbox Automation V4 — Test Execution Graph starting ===")
     info = current_model_info()
@@ -59,16 +59,16 @@ def node_initialize(state: TestState) -> TestState:
         f"(provider={info['provider']}, fallback={info['fallback_model']})"
     )
     log.info(f"Games to test ({len(state['games_to_test'])}): {state['games_to_test']}")
+    # Return ONLY the fields that change — never spread reducer fields (Annotated lists)
+    # or LangGraph will double-append them on every node.
     return {
-        **state,
         "current_step": "initialized",
         "retry_count": 0,
         "error_message": None,
-        "agent_outputs": [],
     }
 
 
-def node_select_next_game(state: TestState) -> TestState:
+def node_select_next_game(state: TestState) -> dict:
     """Pick the next game from the pending list."""
     completed = set(state.get("games_completed", []))
     failed = set(state.get("games_failed", []))
@@ -77,14 +77,14 @@ def node_select_next_game(state: TestState) -> TestState:
 
     if not pending:
         log.info("All games processed.")
-        return {**state, "current_game": "", "current_step": "all_done"}
+        return {"current_game": "", "current_step": "all_done"}
 
     next_game = pending[0]
     log.info(f"Next game: {next_game}")
-    return {**state, "current_game": next_game, "current_step": "launch", "retry_count": 0}
+    return {"current_game": next_game, "current_step": "launch", "retry_count": 0}
 
 
-def node_launch_game(state: TestState) -> TestState:
+def node_launch_game(state: TestState) -> dict:
     """Launch the current game via GIMX controller."""
     game = state["current_game"]
     log.info(f"[{game}] Launching…")
@@ -93,13 +93,13 @@ def node_launch_game(state: TestState) -> TestState:
         instance = get_game_instance(game, console=state["console"])
         ok = instance.launch()
         if ok:
-            return {**state, "current_step": "test", "error_message": None}
+            return {"current_step": "test", "error_message": None}
         else:
-            return {**state, "current_step": "launch_failed",
+            return {"current_step": "launch_failed",
                     "error_message": f"{game} launch returned False"}
     except Exception as exc:
         log.error(f"[{game}] Launch exception: {exc}")
-        return {**state, "current_step": "launch_failed", "error_message": str(exc)}
+        return {"current_step": "launch_failed", "error_message": str(exc)}
 
 
 def node_ai_run_tests(state: TestState) -> TestState:
@@ -133,8 +133,8 @@ def node_ai_run_tests(state: TestState) -> TestState:
     output_lower = agent_result["output"].lower()
     is_success = agent_result["success"] and "fail" not in output_lower
 
+    # Return ONLY the delta for agent_outputs — LangGraph appends it via operator.add
     return {
-        **state,
         "current_step": "quit" if is_success else "test_failed",
         "error_message": None if is_success else agent_result["output"],
         "agent_outputs": [{
@@ -147,7 +147,7 @@ def node_ai_run_tests(state: TestState) -> TestState:
     }
 
 
-def node_quit_game(state: TestState) -> TestState:
+def node_quit_game(state: TestState) -> dict:
     """Quit the current game back to Xbox home."""
     game = state["current_game"]
     log.info(f"[{game}] Quitting…")
@@ -161,8 +161,8 @@ def node_quit_game(state: TestState) -> TestState:
             "test": "PASS",
             "quit": "PASS" if ok else "FAIL",
         }
+        # Delta-only returns: results and games_completed are reducer lists
         return {
-            **state,
             "current_step": "report",
             "results": [result],
             "games_completed": [game],
@@ -170,11 +170,18 @@ def node_quit_game(state: TestState) -> TestState:
         }
     except Exception as exc:
         log.error(f"[{game}] Quit exception: {exc}")
-        return {**state, "current_step": "report", "error_message": str(exc),
-                "games_failed": [game]}
+        # Even on quit failure the game ran — count as completed with a note
+        result = {"game": game, "launch": "PASS", "test": "PASS",
+                  "quit": "FAIL", "error": str(exc)}
+        return {
+            "current_step": "report",
+            "results": [result],
+            "games_completed": [game],
+            "error_message": str(exc),
+        }
 
 
-def node_handle_failure(state: TestState) -> TestState:
+def node_handle_failure(state: TestState) -> dict:
     """Handle failures with retry logic."""
     game = state["current_game"]
     retry = state.get("retry_count", 0) + 1
@@ -182,7 +189,8 @@ def node_handle_failure(state: TestState) -> TestState:
     log.warning(f"[{game}] Failure (attempt {retry}/{max_r}): {state.get('error_message')}")
     if retry <= max_r:
         wait_ms(3000)
-        return {**state, "retry_count": retry, "current_step": "launch"}
+        # Delta-only: just update the counters, no reducer fields
+        return {"retry_count": retry, "current_step": "launch"}
     else:
         log.error(f"[{game}] Max retries exceeded — marking FAIL.")
         result = {
@@ -192,35 +200,44 @@ def node_handle_failure(state: TestState) -> TestState:
             "quit": "FAIL",
             "error": state.get("error_message", ""),
         }
-        return {**state, "current_step": "report", "results": [result],
-                "games_failed": [game]}
+        # Delta-only: append one item to each reducer list
+        return {
+            "current_step": "report",
+            "results": [result],
+            "games_failed": [game],
+        }
 
 
-def node_log_report(state: TestState) -> TestState:
+def node_log_report(state: TestState) -> dict:
     """Log the current game result to the report."""
     from ..reporting.report_generator import ReportGenerator
     gen = ReportGenerator()
+    current = state["current_game"]
+    # Find the most recent result for this game (last entry in the reducer list)
+    latest = None
     for r in state.get("results", []):
-        if r.get("game") == state["current_game"]:
-            status = "PASS" if r.get("test") == "PASS" else "FAIL"
-            gen.add_result(r["game"], "Full Run", status, notes=r.get("error", ""))
-    log.info(f"Result logged for {state['current_game']}")
-    return {**state, "current_step": "select_next"}
+        if r.get("game") == current:
+            latest = r
+    if latest:
+        status = "PASS" if latest.get("quit") == "PASS" else "FAIL"
+        gen.add_result(latest["game"], "Full Run", status, notes=latest.get("error", ""))
+    log.info(f"Result logged for {current}")
+    return {"current_step": "select_next"}
 
 
-def node_finalize(state: TestState) -> TestState:
+def node_finalize(state: TestState) -> dict:
     """Save the final Word report."""
     from ..reporting.report_generator import ReportGenerator
     gen = ReportGenerator()
-    # Re-add all results
+    # Write every accumulated result to the document
     for r in state.get("results", []):
-        status = "PASS" if r.get("test") == "PASS" else "FAIL"
+        status = "PASS" if r.get("quit") == "PASS" else "FAIL"
         gen.add_result(r["game"], "Full Run", status, notes=r.get("error", ""))
     path = gen.save()
     log.info(f"=== Test run complete. Report: {path} ===")
     log.info(f"Completed: {state.get('games_completed')}")
     log.info(f"Failed:    {state.get('games_failed')}")
-    return {**state, "report_path": path, "current_step": "done"}
+    return {"report_path": path, "current_step": "done"}
 
 
 # --- Routing ---

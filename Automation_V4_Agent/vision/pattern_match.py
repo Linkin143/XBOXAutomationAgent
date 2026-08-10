@@ -159,10 +159,15 @@ class ScreenVerifier:
         )
     """
 
-    def __init__(self, capture_device, matcher: PatternMatcher,
-                 captured_folder: str, icon_folder: str):
+    def __init__(
+        self,
+        capture_device=None,
+        matcher: Optional[PatternMatcher] = None,
+        captured_folder: str = "",
+        icon_folder: str = "",
+    ):
         self.capture = capture_device
-        self.matcher = matcher
+        self.matcher = matcher if matcher is not None else PatternMatcher()
         self.captured_folder = captured_folder
         self.icon_folder = icon_folder
 

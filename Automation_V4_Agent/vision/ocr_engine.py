@@ -53,13 +53,19 @@ class OcrEngine:
 
     def __init__(
         self,
-        regions_config_path: str = "config/ocr_regions.yaml",
+        regions_config_path: str = "",
         lang: str = "eng",
         config: str = "--psm 6",
     ):
         self.lang = lang
         self.config = config
         self.regions: dict[str, OcrRegion] = {}
+        # Resolve default path relative to this file so it works regardless of cwd
+        if not regions_config_path:
+            from pathlib import Path
+            regions_config_path = str(
+                Path(__file__).parent.parent / "config" / "ocr_regions.yaml"
+            )
         self._load_regions(regions_config_path)
 
     def _load_regions(self, config_path: str):

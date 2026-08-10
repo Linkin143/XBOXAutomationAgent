@@ -4,10 +4,12 @@ from ..hardware.gimx_controller import XboxButton
 from ..utils.helpers import wait_ms
 from ..utils.logger import get_logger
 from .base_game import BaseGame
+from .registry import register
 
 log = get_logger("game.gears5")
 
 
+@register("gears 5")
 class Gears5Game(BaseGame):
     """Tests for Gears 5 on Xbox."""
 

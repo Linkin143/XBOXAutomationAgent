@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..hardware.gimx_controller import GimxController, XboxButton
-from ..vision.pattern_match import ScreenVerifier
+from ..vision.pattern_match import ScreenVerifier, PatternMatcher
 from ..vision.ocr_engine import OcrEngine
 from ..hardware.video_capture import VideoCapture
 from ..utils.logger import get_logger
@@ -46,7 +46,19 @@ class BaseGame(ABC):
         self.ctrl2 = ctrl2 or ctrl1
         self.capture = capture
         self.console = console
-        self.verifier = ScreenVerifier()
+
+        # Load camera folder paths from hardware config for ScreenVerifier
+        from ..config.loader import get_hw_config
+        cam_cfg = get_hw_config().get("camera", {})
+        captured_folder: str = cam_cfg.get("captured_image_folder", "Images\\Captured\\Console\\")
+        icon_folder: str = cam_cfg.get("icon_image_folder", "Images\\Icon\\XBoxConsole\\")
+
+        self.verifier = ScreenVerifier(
+            capture_device=self.capture,
+            matcher=PatternMatcher(),
+            captured_folder=captured_folder,
+            icon_folder=icon_folder,
+        )
         self.ocr = OcrEngine()
         self._result = GameResult(game_name=self.game_name)
 

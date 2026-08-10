@@ -25,14 +25,21 @@ def get_game_instance(game_name: str, console: int = 1, **kwargs) -> "BaseGame":
     if key not in _REGISTRY:
         raise ValueError(f"Unknown game: '{game_name}'. "
                          f"Available: {list(_REGISTRY.keys())}")
-    from ..hardware.gimx_controller import GimxController
+    from ..hardware.gimx_controller import GimxController, GimxConfig
     from ..config.loader import get_hw_config
-    cfg = get_hw_config().get("gimx", {})
-    host = cfg.get("host", "127.0.0.1")
-    port_c1 = cfg.get("port_c1", 51914)
-    port_c2 = cfg.get("port_c2", 51915)
-    ctrl1 = GimxController(host=host, port=port_c1)
-    ctrl2 = GimxController(host=host, port=port_c2)
+    gimx = get_hw_config().get("gimx", {})
+    c1 = gimx.get("controller_1", {})
+    c2 = gimx.get("controller_2", {})
+    ctrl1 = GimxController(config=GimxConfig(
+        host=c1.get("host", "127.0.0.1"),
+        port=c1.get("port", 51914),
+        com_port=c1.get("com_port", "COM8"),
+    ))
+    ctrl2 = GimxController(config=GimxConfig(
+        host=c2.get("host", "127.0.0.1"),
+        port=c2.get("port", 51915),
+        com_port=c2.get("com_port", "COM6"),
+    ))
     return _REGISTRY[key](ctrl1=ctrl1, ctrl2=ctrl2, console=console, **kwargs)
 
 

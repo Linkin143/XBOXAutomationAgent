@@ -1,20 +1,26 @@
 """
-LLM Factory — LiteLLM unified interface for GPT-4o and Claude Sonnet.
+LLM Factory — provider-aware LangChain chat model factory.
 
-LiteLLM acts as a universal router:
-  - "gpt-4o"                      → OpenAI  (OPENAI_API_KEY)
-  - "claude-3-5-sonnet-20241022"  → Anthropic (ANTHROPIC_API_KEY)
+Routes to the correct dedicated integration package based on model name:
+  - "gpt-4o" / "gpt-4-turbo" / "gpt-4o-mini" / "o1-*"
+        → langchain_openai.ChatOpenAI  (OPENAI_API_KEY)
+  - "claude-*"
+        → langchain_anthropic.ChatAnthropic  (ANTHROPIC_API_KEY)
 
 Switch models by changing LITELLM_MODEL env var — zero code changes needed.
+
+Note: ChatLiteLLM was removed from langchain-community ≥ 0.4.  The dedicated
+      langchain-openai and langchain-anthropic packages are the recommended
+      replacements and are already installed in this environment.
 """
 from __future__ import annotations
 
 import os
-from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
 
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatLiteLLM
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 from ..config.loader import get_llm_config
 from ..utils.logger import get_logger
@@ -24,6 +30,51 @@ load_dotenv()
 
 log = get_logger("llm_factory")
 
+# Union type used in signatures so callers stay type-safe without importing both
+AnyLLM = Union[ChatOpenAI, ChatAnthropic]
+
+
+# ─── Internal helpers ─────────────────────────────────────────────────────────
+
+def _detect_provider(model: str) -> str:
+    """Infer LLM provider from model string."""
+    m = model.lower()
+    if m.startswith("gpt") or m.startswith("o1") or m.startswith("o3"):
+        return "openai"
+    if m.startswith("claude"):
+        return "anthropic"
+    if m.startswith("gemini"):
+        return "google"
+    if "/" in m:
+        return "ollama"   # e.g. "ollama/llama3"
+    return "unknown"
+
+
+def _build_llm(model: str, temperature: float, max_tokens: int,
+               timeout: int, max_retries: int) -> AnyLLM:
+    """Instantiate the correct LangChain chat model class for *model*."""
+    provider = _detect_provider(model)
+
+    if provider == "anthropic":
+        log.info(f"Provider=anthropic  model={model}")
+        return ChatAnthropic(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=float(timeout),
+            max_retries=max_retries,
+        )
+
+    # Default: OpenAI (covers gpt-4o, gpt-4-turbo, gpt-4o-mini, o1-*, unknown)
+    log.info(f"Provider=openai  model={model}")
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=float(timeout),
+        max_retries=max_retries,
+    )
+
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -31,9 +82,9 @@ def get_llm(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
-) -> ChatLiteLLM:
+) -> AnyLLM:
     """
-    Create and return a LangChain-compatible LiteLLM chat model.
+    Create and return a LangChain-compatible chat model.
 
     Priority for model selection:
       1. *model* argument (explicit override)
@@ -41,16 +92,17 @@ def get_llm(
       3. ``llm_config.yaml → llm.primary_model``
 
     API keys are read from environment variables automatically:
-      - ``OPENAI_API_KEY``    for GPT-4o / GPT-4-turbo
+      - ``OPENAI_API_KEY``    for GPT-4o / GPT-4-turbo / GPT-4o-mini
       - ``ANTHROPIC_API_KEY`` for Claude models
 
     Args:
-        model:       LiteLLM model string (e.g. "gpt-4o", "claude-3-5-sonnet-20241022")
+        model:       Model string (e.g. "gpt-4o", "claude-3-5-sonnet-20241022")
         temperature: Sampling temperature (0.0–1.0). Defaults to config value.
         max_tokens:  Max response tokens. Defaults to config value.
 
     Returns:
-        Configured ``ChatLiteLLM`` instance ready for LangChain agent use.
+        Configured ``ChatOpenAI`` or ``ChatAnthropic`` instance ready for
+        LangChain agent use.
     """
     cfg = get_llm_config()["llm"]
 
@@ -69,22 +121,20 @@ def get_llm(
     )
 
     resolved_max_tokens = max_tokens or cfg["max_tokens"]
+    timeout = cfg.get("timeout_seconds", 60)
+    retries = cfg.get("max_retries", 3)
 
-    log.info(f"Creating LLM: model={resolved_model}  temp={resolved_temp}  max_tokens={resolved_max_tokens}")
-
-    llm = ChatLiteLLM(
-        model=resolved_model,
-        temperature=resolved_temp,
-        max_tokens=resolved_max_tokens,
-        request_timeout=cfg.get("timeout_seconds", 60),
-        max_retries=cfg.get("max_retries", 3),
+    log.info(
+        f"Creating LLM: model={resolved_model}  temp={resolved_temp}"
+        f"  max_tokens={resolved_max_tokens}"
     )
-    return llm
+    return _build_llm(resolved_model, resolved_temp, resolved_max_tokens,
+                      timeout, retries)
 
 
-def get_fallback_llm() -> ChatLiteLLM:
+def get_fallback_llm() -> AnyLLM:
     """
-    Return a LiteLLM instance pointing to the configured fallback model.
+    Return a chat model instance pointing to the configured fallback model.
 
     Used automatically by the agent executor when the primary model
     fails or rate-limits.
@@ -98,22 +148,17 @@ def get_fallback_llm() -> ChatLiteLLM:
     return get_llm(model=fallback)
 
 
-def get_llm_with_fallback() -> ChatLiteLLM:
+def get_llm_with_fallback() -> AnyLLM:
     """
-    Return primary LLM; if it fails on first call, transparently use fallback.
+    Return primary LLM.
 
-    This wraps LiteLLM's native fallback capability by configuring
-    the ``fallbacks`` parameter.
+    The agent executor handles automatic fallback via get_fallback_llm()
+    on exception, so this simply returns the primary model.
     """
     cfg = get_llm_config()["llm"]
     primary = os.getenv("LITELLM_MODEL") or cfg["primary_model"]
     fallback = os.getenv("LITELLM_FALLBACK_MODEL") or cfg.get("fallback_model")
-
     log.info(f"LLM with fallback: primary={primary}  fallback={fallback}")
-
-    # LiteLLM supports native fallbacks via litellm.completion(fallbacks=[...])
-    # For LangChain integration we set up the primary and rely on the
-    # agent executor's retry logic + get_fallback_llm() on exception.
     return get_llm(model=primary)
 
 
@@ -129,17 +174,3 @@ def current_model_info() -> dict:
         "max_tokens":     cfg["max_tokens"],
         "provider":       _detect_provider(os.getenv("LITELLM_MODEL") or cfg["primary_model"]),
     }
-
-
-def _detect_provider(model: str) -> str:
-    """Infer LLM provider from model string."""
-    model_lower = model.lower()
-    if model_lower.startswith("gpt") or model_lower.startswith("o1"):
-        return "openai"
-    if model_lower.startswith("claude"):
-        return "anthropic"
-    if model_lower.startswith("gemini"):
-        return "google"
-    if "/" in model_lower:
-        return "ollama"  # e.g. "ollama/llama3"
-    return "unknown"

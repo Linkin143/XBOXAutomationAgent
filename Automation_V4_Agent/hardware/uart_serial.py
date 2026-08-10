@@ -208,6 +208,16 @@ class SerialController:
 
 
 # ─────────────────────────────────────────────
+# Relay port constants (module-level, importable)
+# Source: Constants.ps1 PortOne/PortTwo/PortThree
+# ─────────────────────────────────────────────
+
+PORT_ONE   = 0x43
+PORT_TWO   = 0x46
+PORT_THREE = 0x4A
+
+
+# ─────────────────────────────────────────────
 # Relay Controller
 # Source: Constants.ps1 port/byte constants + XBoxConsoleRelay.ps1
 # ─────────────────────────────────────────────
@@ -215,7 +225,11 @@ class SerialController:
 class RelayController:
     """
     Controls the relay board (NCD Relay) via COM8 @ 9600 baud.
-    
+
+    Can be constructed two ways:
+      1. RelayController(port="COM8", baud_rate=9600)      ← simple (recommended)
+      2. RelayController(serial_ctrl=SerialController(...)) ← pre-built controller
+
     Port byte map from Constants.ps1:
         PortOne = 0x43, PortTwo = 0x46, PortThree = 0x4A
     Button byte values:
@@ -223,9 +237,9 @@ class RelayController:
         five=0x10, six=0x20, seven=0x40, eight=0x80
     """
 
-    PORT_ONE   = 0x43
-    PORT_TWO   = 0x46
-    PORT_THREE = 0x4A
+    PORT_ONE   = PORT_ONE
+    PORT_TWO   = PORT_TWO
+    PORT_THREE = PORT_THREE
 
     ZERO  = 0x00
     ONE   = 0x01
@@ -237,8 +251,20 @@ class RelayController:
     SEVEN = 0x40
     EIGHT = 0x80
 
-    def __init__(self, serial_ctrl: SerialController):
+    def __init__(
+        self,
+        serial_ctrl: Optional[SerialController] = None,
+        port: str = "COM8",
+        baud_rate: int = 9600,
+    ):
+        # If no pre-built SerialController is supplied, create one from port/baud_rate.
+        # This lets callers do: RelayController(port="COM8", baud_rate=9600)
+        if serial_ctrl is None:
+            cfg = SerialPortConfig(label="relay", port=port, baud_rate=baud_rate)
+            serial_ctrl = SerialController(cfg)
         self._serial = serial_ctrl
+        # Expose as .serial so external callers can do relay.serial.connect()
+        self.serial = self._serial
 
         # Button byte commands from Constants.ps1
         self.CTRLLER1_A = bytes([self.PORT_ONE,   self.TWO])
@@ -290,10 +316,25 @@ class ArduinoKBMController:
 
     The Arduino firmware should implement a serial protocol
     where byte commands trigger keyboard/mouse actions on the console.
+
+    Can be constructed two ways:
+      1. ArduinoKBMController(port="COM3", baud_rate=9600)      ← simple (recommended)
+      2. ArduinoKBMController(serial_ctrl=SerialController(...)) ← pre-built controller
     """
 
-    def __init__(self, serial_ctrl: SerialController):
+    def __init__(
+        self,
+        serial_ctrl: Optional[SerialController] = None,
+        port: str = "COM3",
+        baud_rate: int = 9600,
+    ):
+        # If no pre-built SerialController is supplied, create one from port/baud_rate.
+        if serial_ctrl is None:
+            cfg = SerialPortConfig(label="arduino_kbm", port=port, baud_rate=baud_rate)
+            serial_ctrl = SerialController(cfg)
         self._serial = serial_ctrl
+        # Expose as .serial so external callers can do arduino.serial.connect()
+        self.serial = self._serial
 
     def send_command(self, cmd: bytes):
         """Send raw command bytes to Arduino"""

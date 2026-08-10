@@ -4,16 +4,27 @@
 #           eDAT_KBM_Hardware_Configuration.xml
 # ============================================================
 
+# ── ViGEmBus virtual controller (replaces GIMX+Arduino for Xbox Series S) ──
+# Uses vgamepad.VX360Gamepad() — no COM port, no GIMX.exe, no Arduino needed.
+vigem:
+  enabled: true
+  short_press_ms: 110
+  long_press_ms: 1500
+  cooldown_ms: 220
+
 gimx:
   # GIMX controller emulation (runs as separate process)
-  executable: "C:\\Program Files\\GIMX\\gimx.exe"
-  config_dir: "C:\\Program Files\\GIMX\\"
+  # Installed at Program Files (x86) on this machine
+  executable: "C:\\Program Files (x86)\\GIMX\\gimx.exe"
+  config_dir: "C:\\Users\\testx\\AppData\\Roaming\\gimx\\config\\"
 
   controller_1:
-    config_file: "XOnePadUsb.xml"
+    # Xbox_latest.xml reads from the real Xbox Series S controller on PC for auth,
+    # while --src lets Python inject button values via UDP.
+    config_file: "Xbox_latest.xml"
     host: "127.0.0.1"
     port: 51914
-    com_port: "COM3"       # GIMX USB adapter COM port (check Device Manager)
+    com_port: "COM8"       # Arduino EMUXONE adapter (USB Serial VID:PID=0403:6001)
 
   controller_2:
     config_file: "XOnePadUsb.xml"
